@@ -19,6 +19,10 @@ using namespace web::http::experimental::listener;
 
 mongocxx::instance inst{};  // Create a new instance
 
+// Function to handle request to endpoint
+
+
+
 void flightRequest(const http_request& request) {
     std::vector<bsoncxx::document::view> departureDocs;
     std::vector<bsoncxx::document::view> returnDocs;
@@ -145,14 +149,34 @@ void flightRequest(const http_request& request) {
     request.reply(response);
 }
 
+void hotelsRequest(const http_request& request){
+    // TO-DO
+    
 
+}
 
+void handleRequest(const http_request& request) {
+    auto path = request.request_uri().path();
 
+    if (path == "/flight") {
+        // Handle flights request
+        flightRequest(request);
+    } else if (path == "/hotel") {
+        // Handle hotels request
+        hotelsRequest(request);
+    } else {
+        // Invalid endpoint, return 404 Not Found
+        http_response response(status_codes::NotFound);
+        response.set_body("Invalid endpoint");
+        request.reply(response);
+    }
+}
 int main() {
-    http_listener listener("http://localhost:8080");
 
-    // Register flightRequest as the handler for "/flight" endpoint
-    listener.support(methods::GET, flightRequest);
+
+    http_listener listener("http://localhost:8080");
+    // Register handleRequest as the request handler for all endpoints
+    listener.support(methods::GET, handleRequest);
 
     try {
         listener.open().wait();
@@ -168,3 +192,4 @@ int main() {
 
     return 0;
 }
+// g++ -std=c++11 -I/usr/local/include/mongocxx/v_noabi -I/usr/local/include/bsoncxx/v_noabi -I/usr/include/cpprest -o output_file main.cpp -lmongocxx -lbsoncxx -lcpprest -lssl -lcrypto -Wl,-rpath,/usr/local/lib
