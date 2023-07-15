@@ -148,16 +148,6 @@ void flightRequest(const http_request& request) {
 
 
 
-
-
-
-
-
-
-
-
-
-
 int main() {
     http_listener listener("http://localhost:8080");
 
