@@ -196,7 +196,7 @@ void hotelsRequest(const http_request& request){
     "$gte": ISODate(<CHECK IN DATE>),
 	"$lte": ISODate(<CHECK OUT DATE>)
   },
-  "city": "Frankfurt"
+  "city": "<Destination>"
 }
     
     */
@@ -247,29 +247,46 @@ void hotelsRequest(const http_request& request){
         }
     }
 
-    web::json::value responseJSON = web::json::value::array();
+    std::string checkInDateStr = utility::conversions::to_utf8string(checkInDate);
+    std::string checkOutDateStr = utility::conversions::to_utf8string(checkOutDate);
 
-    web::json::value flightJSON;
-    flightJSON["City"] = web::json::value::string(destination);
-    flightJSON["Check In Date"] = web::json::value::string(checkInDate);
-    flightJSON["Check Out Date"] = web::json::value::string(checkOutDate);
-    flightJSON["Hotel"] = web::json::value::string(cheapestHotel);
-    flightJSON["Price"] = web::json::value::number(cheapestPrice);
-    responseJSON[responseJSON.size()] = flightJSON;
+    std::ostringstream responseStream;
+    responseStream << "[";
 
-    std::string jsonResponse = responseJSON.serialize();
-    // jsonResponse += "\n";
-    std::cout << "Response JSON: " << jsonResponse << std::endl;
+    // Loop over each hotel and add it to the response
+    bool isFirst = true;
+    for (const auto& hotel : hotelPrices) {
+        std::string hotelName = hotel.first;
+        int price = hotel.second;
 
-    // Create the JSON response string
-    std::stringstream responseStream;
-    responseStream << jsonResponse;
+        // Add the hotel to the response only if it has the cheapest price
+        if (price == cheapestPrice) {
+            if (!isFirst) {
+                responseStream << ",";
+            }
+            isFirst = false;
+
+            responseStream << "{";
+            responseStream << "\"City\": \"" << destination << "\",";
+            responseStream << "\"Check In Date\": \"" << checkInDateStr << "\",";
+            responseStream << "\"Check Out Date\": \"" << checkOutDateStr << "\",";
+            responseStream << "\"Hotel\": \"" << hotelName << "\",";
+            responseStream << "\"Price\": " << price;
+            responseStream << "}";
+        }
+    }
+
+    responseStream << "]";
+
+    std::string jsonResponse = responseStream.str();
 
     // Send the JSON response
     http_response response(status_codes::OK);
     response.headers().set_content_type("application/json");
-    response.set_body(responseStream.str());
+    response.set_body(jsonResponse);
     request.reply(response);
+
+
 }
 
 void handleRequest(const http_request& request) {
