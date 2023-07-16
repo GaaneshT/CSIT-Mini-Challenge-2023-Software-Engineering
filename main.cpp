@@ -6,9 +6,10 @@
 #include <mongocxx/uri.hpp>
 #include <bsoncxx/json.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
-#include <chrono>   // for date and time operations
-#include <iomanip>  // for std::get_time
-#include <sstream>  // for std::istringstream
+#include <chrono> 
+#include <iomanip> 
+#include <sstream>  
+
 
 
 
@@ -123,31 +124,26 @@ void flightRequest(const http_request& request) {
     }
 
     // Prepare the JSON response
-    web::json::value responseJSON = web::json::value::array();
+    std::ostringstream responseStream;
+    responseStream << "[ { ";
+    responseStream << "\"City\": \"" << destination << "\", ";
+    responseStream << "\"Departure Date\": \"" << departureDate << "\", ";
+    responseStream << "\"Departure Airline\": \"" << cheapestDepartureDoc["airlinename"].get_utf8().value.to_string() << "\", ";
+    responseStream << "\"Departure Price\": " << cheapestDeparturePrice << ", ";
+    responseStream << "\"Return Date\": \"" << returnDate << "\", ";
+    responseStream << "\"Return Airline\": \"" << cheapestReturnDoc["airlinename"].get_utf8().value.to_string() << "\", " ;
+    responseStream << "\"Return Price\": " << cheapestReturnPrice;
+    responseStream << " } ]";
 
-    web::json::value flightJSON;
-    flightJSON["City"] = web::json::value::string(destination);
-    flightJSON["Departure Date"] = web::json::value::string(departureDate);
-    flightJSON["Departure Airline"] = web::json::value::string(cheapestDepartureDoc["airlinename"].get_utf8().value.to_string());
-    flightJSON["Departure Price"] = web::json::value::number(cheapestDeparturePrice);
-    flightJSON["Return Date"] = web::json::value::string(returnDate);
-    flightJSON["Return Airline"] = web::json::value::string(cheapestReturnDoc["airlinename"].get_utf8().value.to_string());
-    flightJSON["Return Price"] = web::json::value::number(cheapestReturnPrice);
-    responseJSON[responseJSON.size()] = flightJSON;
-
-    std::string jsonResponse = responseJSON.serialize();
-    std::cout << "Response JSON: " << jsonResponse << std::endl;
-
-    // Create the JSON response string
-    std::stringstream responseStream;
-    responseStream << jsonResponse;
+    std::string jsonResponse = responseStream.str();
 
     // Send the JSON response
     http_response response(status_codes::OK);
     response.headers().set_content_type("application/json");
-    response.set_body(responseStream.str());
+    response.set_body(jsonResponse);
     request.reply(response);
 }
+
 
 void hotelsRequest(const http_request& request){
     // TO-DO
@@ -290,6 +286,7 @@ void hotelsRequest(const http_request& request){
 }
 
 void handleRequest(const http_request& request) {
+    std::cout << "Called handleRequest"<<std::endl;
     auto path = request.request_uri().path();
 
     if (path == "/flight") {
@@ -305,10 +302,11 @@ void handleRequest(const http_request& request) {
         request.reply(response);
     }
 }
+
 int main() {
 
 
-    http_listener listener("http://localhost:8080");
+    http_listener listener("http://0.0.0.0:8080");
     // Register handleRequest as the request handler for all endpoints
     listener.support(methods::GET, handleRequest);
 
