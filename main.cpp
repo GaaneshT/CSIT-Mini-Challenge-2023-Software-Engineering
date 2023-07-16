@@ -9,7 +9,7 @@
 #include <chrono> 
 #include <iomanip> 
 #include <sstream>  
-
+#include <regex>
 
 
 
@@ -21,6 +21,40 @@ using namespace web::http::experimental::listener;
 mongocxx::instance inst{};  // Create a new instance
 
 // Function to handle request to endpoint
+
+
+bool IsValidDateFormat(const std::string& date) {
+    // Regular expression pattern for yyyy-mm-dd format
+    std::regex pattern("\\d{4}-\\d{2}-\\d{2}");
+
+    // Check if the date matches the pattern
+    if (!std::regex_match(date, pattern)) {
+        return false;
+    }
+
+    // Parse the date using std::istringstream
+    std::istringstream dateStream(date);
+    int year, month, day;
+    char separator1, separator2;
+    dateStream >> year >> separator1 >> month >> separator2 >> day;
+
+    // Check if the date was successfully parsed and is valid
+    if (!dateStream || separator1 != '-' || separator2 != '-' || month < 1 || month > 12 || day < 1 || day > 31) {
+        return false;
+    }
+
+    // Check if the date is a real calendar date
+    std::tm timeinfo = {};
+    timeinfo.tm_year = year - 1900;
+    timeinfo.tm_mon = month - 1;
+    timeinfo.tm_mday = day;
+
+    std::time_t time = std::mktime(&timeinfo);
+
+    return time != -1;
+}
+
+
 
 
 
@@ -63,6 +97,14 @@ void flightRequest(const http_request& request) {
     std::cout << "returnDate: " << returnDateString << std::endl;
     std::cout << "destination: " << destination << std::endl;
 
+    // Check if the dates are valid
+    if (!IsValidDateFormat(departureDate) || !IsValidDateFormat(returnDate)) {
+        http_response response(status_codes::BadRequest);
+        response.set_body("Invalid date format for Departure Date or Return Date");
+        request.reply(response);
+        return;
+    }
+
     mongocxx::uri uri("mongodb+srv://userReadOnly:7ZT817O8ejDfhnBM@minichallenge.q4nve1r.mongodb.net/");
     mongocxx::client conn{uri};
     mongocxx::database db = conn["minichallenge"];
@@ -93,10 +135,17 @@ void flightRequest(const http_request& request) {
     std::cout << "Number of departure documents: " << departureDocs.size() << std::endl;
     std::cout << "Number of return documents: " << returnDocs.size() << std::endl;
 
-    // Check if any of the required query parameters are missing
-    if (departureDocs.empty() || returnDocs.empty()) {
+    if (departureDate.empty() || returnDate.empty() || destination.empty()) {
         http_response response(status_codes::BadRequest);
-        response.set_body("No flights found for the given parameters");
+        response.set_body("Missing required query parameters");
+        request.reply(response);
+        return;
+    }
+
+    // Check if any of the flights are missing
+    if (departureDocs.empty() && returnDocs.empty()) {
+        http_response response(status_codes::OK);
+        response.set_body("[]"); // Return an empty list
         request.reply(response);
         return;
     }
@@ -171,6 +220,12 @@ void hotelsRequest(const http_request& request){
         } else if (key == destinationKey) {
             destination = value;
         }
+    }
+        if (!IsValidDateFormat(checkOutDate) || !IsValidDateFormat(checkInDate)) {
+        http_response response(status_codes::BadRequest);
+        response.set_body("Invalid date format for check In Date or check Out Date");
+        request.reply(response);
+        return;
     }
     std::string checkInDateString =  checkInDate+ "T00:00:00.000Z";
     std::string checkOutDateString = checkOutDate + "T00:00:00.000Z";
