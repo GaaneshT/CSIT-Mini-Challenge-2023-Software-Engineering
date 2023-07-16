@@ -151,8 +151,125 @@ void flightRequest(const http_request& request) {
 
 void hotelsRequest(const http_request& request){
     // TO-DO
-    
+    std::vector<bsoncxx::document::view> hotelDocs;
+    std::cout<< "hotelsRequest function called!"<< std::endl;
+    // The key here is to match the query
+    utility::string_t checkOutDateKey = "checkOutDate";
+    utility::string_t checkInDateKey = "checkInDate";
+    utility::string_t destinationKey = "destination";
 
+    std::map<utility::string_t, utility::string_t> queryParameters = web::uri::split_query(request.request_uri().query());
+
+    utility::string_t checkOutDate;
+    utility::string_t checkInDate;
+    utility::string_t destination;
+
+    for (const auto& kvp : queryParameters) {
+        const utility::string_t& key = kvp.first;
+        const utility::string_t& value = kvp.second;
+
+        if (key == checkOutDateKey) {
+            checkOutDate = value;
+        } else if (key == checkInDateKey) {
+            checkInDate = value;
+        } else if (key == destinationKey) {
+            destination = value;
+        }
+    }
+    std::string checkInDateString =  checkInDate+ "T00:00:00.000Z";
+    std::string checkOutDateString = checkOutDate + "T00:00:00.000Z";
+    // Testing - Passed
+    std::cout<<"Check in date is : " << checkInDateString<<std::endl;
+    std::cout<<"Check out date is : " << checkOutDateString<<std::endl;
+    std::cout<<"Destination : " << destination<<std::endl;
+
+    // Connect to the database
+    mongocxx::uri uri("mongodb+srv://userReadOnly:7ZT817O8ejDfhnBM@minichallenge.q4nve1r.mongodb.net/");
+    mongocxx::client conn{uri};
+    mongocxx::database db = conn["minichallenge"];
+    mongocxx::collection flights = db["hotels"];
+
+    /*
+    Filter
+    {
+  "date": {
+    "$gte": ISODate(<CHECK IN DATE>),
+	"$lte": ISODate(<CHECK OUT DATE>)
+  },
+  "city": "Frankfurt"
+}
+    
+    */
+    
+    std::string hotelFilter = "{ \"date\": { \"$gte\": { \"$date\": \"" + checkInDateString + "\" }, \"$lte\": { \"$date\": \"" + checkOutDateString + "\" } }, \"city\": \"" + destination + "\" }";
+    std::cout << "filter is: "<< hotelFilter <<std::endl;
+
+    mongocxx::options::find opts{};
+    opts.projection(bsoncxx::builder::stream::document{} << "city" << 1 << "date" << 1 <<"hotelName" << 1 << "price" << 1 << bsoncxx::builder::stream::finalize);
+
+    bsoncxx::document::view_or_value HotelFilterView = bsoncxx::from_json(hotelFilter);
+
+    mongocxx::cursor Hotelcursor = flights.find(HotelFilterView, opts);
+    for (const auto& doc : Hotelcursor) {
+        hotelDocs.push_back(doc);
+    }
+
+
+    std::cout << "Number of hotel documents: " << hotelDocs.size() << std::endl;
+
+    std::vector<std::string> hotelNames;
+    std::unordered_map<std::string, int> hotelPrices;
+
+    // Retrieve hotel names and initialize prices to 0
+    for (const auto& doc : hotelDocs) {
+        std::string hotelName = doc["hotelName"].get_utf8().value.to_string();
+        int price = doc["price"].get_int32().value;
+
+        // Check if the hotel name already exists in the map
+        if (hotelPrices.find(hotelName) == hotelPrices.end()) {
+            hotelNames.push_back(hotelName);
+            hotelPrices[hotelName] = 0;
+        }
+
+        // Accumulate prices for the hotel
+        hotelPrices[hotelName] += price;
+    }
+
+    // Find the cheapest hotel
+    std::string cheapestHotel;
+    int cheapestPrice = INT_MAX;
+    for (const auto& hotel : hotelPrices) {
+        std::string hotelName = hotel.first;
+        int price = hotel.second;
+        if (price < cheapestPrice) {
+            cheapestHotel = hotelName;
+            cheapestPrice = price;
+        }
+    }
+
+    web::json::value responseJSON = web::json::value::array();
+
+    web::json::value flightJSON;
+    flightJSON["City"] = web::json::value::string(destination);
+    flightJSON["Check In Date"] = web::json::value::string(checkInDate);
+    flightJSON["Check Out Date"] = web::json::value::string(checkOutDate);
+    flightJSON["Hotel"] = web::json::value::string(cheapestHotel);
+    flightJSON["Price"] = web::json::value::number(cheapestPrice);
+    responseJSON[responseJSON.size()] = flightJSON;
+
+    std::string jsonResponse = responseJSON.serialize();
+    // jsonResponse += "\n";
+    std::cout << "Response JSON: " << jsonResponse << std::endl;
+
+    // Create the JSON response string
+    std::stringstream responseStream;
+    responseStream << jsonResponse;
+
+    // Send the JSON response
+    http_response response(status_codes::OK);
+    response.headers().set_content_type("application/json");
+    response.set_body(responseStream.str());
+    request.reply(response);
 }
 
 void handleRequest(const http_request& request) {
