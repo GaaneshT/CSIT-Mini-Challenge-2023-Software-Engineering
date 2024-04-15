@@ -2,6 +2,8 @@
 
 This repository is part of my submission for the CSIT Mini Challenge. The codebase includes a C++ application that serves as a backend service to find the best deals on flights and hotels.
 
+![Badge of Completion](https://github.com/GaaneshT/CSIT-Mini-Challenge-2023-Software-Engineering/blob/main/csit-se-challenge-2023-dbadge.png)
+
 ## Application Overview
 
 The service exposes two endpoints, `/flight` and `/hotel`, which users can query to retrieve the cheapest flight and hotel options, respectively. It is designed to run on a local server and interact with a MongoDB database for data retrieval.
